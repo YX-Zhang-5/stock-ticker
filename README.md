@@ -1,7 +1,3 @@
-<<<<<<< HEAD
-# stock-ticker
-股票实时行情显示网页
-=======
 # 📈 股票实时行情
 
 一个现代化的股票行情显示应用，支持实时数据、关注列表和搜索功能。
@@ -98,4 +94,3 @@ MIT License
 
 - GitHub: [@your-username](https://github.com/your-username)
 - Email: your-email@example.com
->>>>>>> c503c29 (Initial commit)

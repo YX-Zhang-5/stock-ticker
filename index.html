@@ -105,11 +105,14 @@
 
         <!-- Last update -->
         <div id="lastUpdate" class="text-center text-gray-400 text-sm mb-8">
-            最后更新: 2024-01-01 12:00:00
+            点击刷新按钮获取最新数据
         </div>
 
         <!-- Control Buttons -->
         <div id="controlButtons" class="absolute top-4 right-4 flex gap-2 z-10 hidden">
+            <button id="refreshBtn" onclick="refreshStockData(event)" class="px-3 py-2 rounded-lg text-sm font-medium bg-orange-500 text-white hover:bg-orange-600 transition-colors">
+                🔄 刷新
+            </button>
             <button id="watchlistBtn" onclick="toggleWatchlist(event)" class="px-3 py-2 rounded-lg text-sm font-medium transition-colors bg-blue-500 text-white hover:bg-blue-600">
                 ☆ 关注
             </button>
@@ -242,7 +245,7 @@
         let watchList = [];
         let showUI = false;
         let searchTimeout = null;
-        let apiKey = 'demo'; // 🔑 请替换为您的 Alpha Vantage API Key
+        let apiKey = 'MSXYLJSDZU82SIWG'; // 🔑 请替换为您的 Alpha Vantage API Key
         let isRealtime = false;
         let updateInterval = null;
         let lastApiCall = 0;
@@ -302,8 +305,8 @@
             // 初始化UI
             updateWatchListButton();
             
-            // 加载初始股票数据
-            loadStockData(currentStock.symbol);
+            // 不再自动加载数据，等待用户手动刷新
+            console.log('✅ 应用初始化完成，等待手动刷新数据');
         }
 
         // 检查URL参数
@@ -317,8 +320,8 @@
                     currentStock = { name: stock.name, price: 150.25, symbol: stock.symbol };
                     document.getElementById('stockName').textContent = stock.name;
                     document.getElementById('stockPrice').textContent = '$150.25';
-                    // 加载真实数据
-                    loadStockData(symbol.toUpperCase());
+                    // 不再自动加载数据，等待用户手动刷新
+                    document.getElementById('lastUpdate').textContent = '点击刷新按钮获取最新数据';
                 }
             }
         }
@@ -483,6 +486,27 @@
             }
             isRealtime = false;
             console.log('⏹️ 实时更新已停止');
+        }
+
+        // 手动刷新股票数据
+        function refreshStockData(event) {
+            if (event) event.stopPropagation();
+            
+            const refreshBtn = document.getElementById('refreshBtn');
+            const originalText = refreshBtn.textContent;
+            
+            // 显示加载状态
+            refreshBtn.textContent = '⏳ 加载中...';
+            refreshBtn.disabled = true;
+            
+            // 刷新数据
+            loadStockData(currentStock.symbol).finally(() => {
+                // 恢复按钮状态
+                refreshBtn.textContent = originalText;
+                refreshBtn.disabled = false;
+            });
+            
+            console.log('🔄 手动刷新股票数据:', currentStock.symbol);
         }
 
         // 切换实时更新
@@ -656,10 +680,8 @@
             document.getElementById('stockName').textContent = name;
             document.getElementById('stockPrice').textContent = '$' + price.toFixed(2);
             
-            // 如果有symbol，尝试加载真实数据
-            if (symbol) {
-                loadStockData(symbol);
-            }
+            // 更新最后更新时间提示
+            document.getElementById('lastUpdate').textContent = '点击刷新按钮获取最新数据';
             
             hideWatchList();
             hideUI();
