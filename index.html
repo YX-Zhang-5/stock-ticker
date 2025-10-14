@@ -651,13 +651,13 @@
         }
 
         function isInWatchList() {
-            return watchList.some(stock => stock.name === currentStock.name);
+            return watchList.some(stock => stock.symbol === currentStock.symbol);
         }
 
         function toggleWatchlist(event) {
             event.stopPropagation();
             if (isInWatchList()) {
-                watchList = watchList.filter(stock => stock.name !== currentStock.name);
+                watchList = watchList.filter(stock => stock.symbol !== currentStock.symbol);
                 document.getElementById('watchlistBtn').textContent = '☆ 关注';
                 document.getElementById('watchlistBtn').className = 'px-3 py-2 rounded-lg text-sm font-medium transition-colors bg-blue-500 text-white hover:bg-blue-600';
             } else {
@@ -721,7 +721,7 @@
                                 <button onclick="switchToStock('${stock.name}', ${stock.price}, '${stock.symbol || ''}')" class="px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600">
                                     查看
                                 </button>
-                                <button onclick="removeFromWatchList('${stock.name}')" class="px-3 py-1 bg-red-500 text-white rounded text-sm hover:bg-red-600">
+                                <button onclick="removeFromWatchList('${stock.symbol}')" class="px-3 py-1 bg-red-500 text-white rounded text-sm hover:bg-red-600">
                                     移除
                                 </button>
                             </div>
@@ -785,9 +785,9 @@
                     try {
                         const importedData = JSON.parse(e.target.result);
                         if (Array.isArray(importedData)) {
-                            // 合并导入的数据
-                            const existingNames = watchList.map(stock => stock.name);
-                            const newStocks = importedData.filter(stock => !existingNames.includes(stock.name));
+                            // 合并导入的数据，避免重复
+                            const existingSymbols = watchList.map(stock => stock.symbol);
+                            const newStocks = importedData.filter(stock => !existingSymbols.includes(stock.symbol));
                             watchList = [...watchList, ...newStocks];
                             saveWatchList();
                             updateWatchListDisplay();
@@ -918,8 +918,14 @@
             const stock = {
                 name: name,
                 symbol: symbol,
-                price: 150.25 // 默认价格
+                price: 0 // 默认价格，等待API获取
             };
+            
+            // 检查是否已存在
+            if (watchList.some(s => s.symbol === symbol)) {
+                showMessage(`${name} (${symbol}) 已在关注列表中`, 'error');
+                return;
+            }
             
             // 添加到关注列表
             watchList.push(stock);
