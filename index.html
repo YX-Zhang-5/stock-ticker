@@ -734,10 +734,18 @@
         function switchToStock(name, price, symbol) {
             currentStock = { name, price, symbol };
             document.getElementById('stockName').textContent = name;
-            document.getElementById('stockPrice').textContent = '$' + price.toFixed(2);
+            document.getElementById('stockPrice').textContent = '--';
+            document.getElementById('stockChange').textContent = '--';
+            document.getElementById('stockPct').textContent = '--';
             
-            // 更新最后更新时间提示
-            document.getElementById('lastUpdate').textContent = '点击刷新按钮获取最新数据';
+            // 设置初始颜色为灰色
+            document.getElementById('stockPrice').style.color = '#9ca3af';
+            document.getElementById('stockChange').style.color = '#9ca3af';
+            document.getElementById('stockPct').style.color = '#9ca3af';
+            
+            // 立即加载API数据
+            document.getElementById('lastUpdate').textContent = '正在加载数据...';
+            loadStockData(symbol);
             
             hideWatchList();
             hideUI();
