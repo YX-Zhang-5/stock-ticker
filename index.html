@@ -88,19 +88,19 @@
         <!-- Name / Ticker -->
         <div class="w-full overflow-hidden mb-2">
             <div id="stockName" class="text-center font-semibold tracking-tight text-[12vmin] mobile-optimized" title="AAPL">
-                AAPL
+                Apple Inc.
             </div>
         </div>
 
         <!-- Price big -->
-        <div id="stockPrice" class="text-center font-black leading-none text-[35vmin] text-red-500">
-            $150.25
+        <div id="stockPrice" class="text-center font-black leading-none text-[35vmin] text-gray-400">
+            --
         </div>
 
         <!-- Change info -->
         <div class="flex justify-center gap-4 text-[8vmin] mb-4">
-            <span id="stockChange" class="text-red-400">▲ +$2.50</span>
-            <span id="stockPct" class="text-red-400">+1.69%</span>
+            <span id="stockChange" class="text-gray-400">--</span>
+            <span id="stockPct" class="text-gray-400">--</span>
         </div>
 
         <!-- Last update -->
@@ -298,6 +298,9 @@
                 document.getElementById('loadingScreen').style.display = 'none';
             }, 1000);
 
+            // 初始化显示状态
+            initializeDisplay();
+            
             // 加载关注列表
             loadWatchList();
             
@@ -307,8 +310,46 @@
             // 初始化UI
             updateWatchListButton();
             
-            // 不再自动加载数据，等待用户手动刷新
-            console.log('✅ 应用初始化完成，等待手动刷新数据');
+            // 自动加载初始数据
+            loadInitialData();
+            
+            console.log('✅ 应用初始化完成，正在加载初始数据');
+        }
+
+        // 初始化显示状态
+        function initializeDisplay() {
+            // 确保显示正确的初始状态
+            document.getElementById('stockName').textContent = 'Apple Inc.';
+            document.getElementById('stockPrice').textContent = '--';
+            document.getElementById('stockChange').textContent = '--';
+            document.getElementById('stockPct').textContent = '--';
+            document.getElementById('lastUpdate').textContent = '正在加载初始数据...';
+            
+            // 设置初始颜色为灰色
+            document.getElementById('stockPrice').style.color = '#9ca3af';
+            document.getElementById('stockChange').style.color = '#9ca3af';
+            document.getElementById('stockPct').style.color = '#9ca3af';
+        }
+
+        // 加载初始数据
+        async function loadInitialData() {
+            try {
+                // 显示加载状态
+                document.getElementById('lastUpdate').textContent = '正在加载初始数据...';
+                
+                // 等待一小段时间确保页面完全加载
+                await new Promise(resolve => setTimeout(resolve, 500));
+                
+                // 加载当前股票的数据
+                await loadStockData(currentStock.symbol);
+                
+                console.log('✅ 初始数据加载完成');
+                
+            } catch (error) {
+                console.error('初始数据加载失败:', error);
+                // 如果初始加载失败，保持"--"状态
+                document.getElementById('lastUpdate').textContent = '初始数据加载失败，请手动刷新';
+            }
         }
 
         // 检查URL参数
@@ -319,11 +360,12 @@
             if (symbol) {
                 const stock = STOCK_DATABASE[symbol.toUpperCase()];
                 if (stock) {
-                    currentStock = { name: stock.name, price: 150.25, symbol: stock.symbol };
+                    currentStock = { name: stock.name, price: 0, symbol: stock.symbol };
                     document.getElementById('stockName').textContent = stock.name;
-                    document.getElementById('stockPrice').textContent = '$150.25';
-                    // 不再自动加载数据，等待用户手动刷新
-                    document.getElementById('lastUpdate').textContent = '点击刷新按钮获取最新数据';
+                    document.getElementById('stockPrice').textContent = '--';
+                    document.getElementById('stockChange').textContent = '--';
+                    document.getElementById('stockPct').textContent = '--';
+                    document.getElementById('lastUpdate').textContent = '正在加载数据...';
                 }
             }
         }
@@ -443,7 +485,7 @@
             const isPositive = data.change >= 0;
             const arrow = isPositive ? '▲' : '▼';
             const changeText = arrow + ' ' + (isPositive ? '+' : '') + '$' + data.change.toFixed(2);
-            const pctText = (isPositive ? '+' : '') + data.changePercent.toFixed(2) + '%';
+            const pctText = '(' + (isPositive ? '+' : '') + data.changePercent.toFixed(2) + '%)';
             
             document.getElementById('stockChange').textContent = changeText;
             document.getElementById('stockPct').textContent = pctText;
