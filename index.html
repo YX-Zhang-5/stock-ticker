@@ -119,6 +119,9 @@
             <button onclick="showSearchModal()" class="px-3 py-2 rounded-lg text-sm font-medium bg-green-500 text-white hover:bg-green-600 transition-colors">
                 🔍 搜索
             </button>
+            <button onclick="toggleRealtime()" class="px-3 py-2 rounded-lg text-sm font-medium bg-purple-500 text-white hover:bg-purple-600 transition-colors">
+                📡 实时
+            </button>
             <button onclick="hideUI()" class="px-3 py-2 rounded-lg text-sm font-medium bg-gray-700 text-white hover:bg-gray-800 transition-colors">
                 ✕
             </button>
@@ -225,11 +228,25 @@
 
     <!-- Main Application Script -->
     <script>
+        // ========================================
+        // API 配置说明
+        // ========================================
+        // 1. 注册 Alpha Vantage API: https://www.alphavantage.co/support/#api-key
+        // 2. 将下面的 'demo' 替换为您的 API Key
+        // 3. 免费版本限制：每分钟5次请求，每天500次请求
+        // 4. 如果API失败，系统会自动使用模拟数据
+        // ========================================
+        
         // 全局变量
-        let currentStock = { name: 'Apple Inc.', price: 150.25 };
+        let currentStock = { name: 'Apple Inc.', price: 150.25, symbol: 'AAPL' };
         let watchList = [];
         let showUI = false;
         let searchTimeout = null;
+        let apiKey = 'demo'; // 🔑 请替换为您的 Alpha Vantage API Key
+        let isRealtime = false;
+        let updateInterval = null;
+        let lastApiCall = 0;
+        const API_CALL_INTERVAL = 5000; // 5秒间隔，避免API限制
 
         // 股票数据库
         const STOCK_DATABASE = {
@@ -284,6 +301,9 @@
             
             // 初始化UI
             updateWatchListButton();
+            
+            // 加载初始股票数据
+            loadStockData(currentStock.symbol);
         }
 
         // 检查URL参数
@@ -294,10 +314,185 @@
             if (symbol) {
                 const stock = STOCK_DATABASE[symbol.toUpperCase()];
                 if (stock) {
-                    currentStock = { name: stock.name, price: 150.25 };
+                    currentStock = { name: stock.name, price: 150.25, symbol: stock.symbol };
                     document.getElementById('stockName').textContent = stock.name;
                     document.getElementById('stockPrice').textContent = '$150.25';
+                    // 加载真实数据
+                    loadStockData(symbol.toUpperCase());
                 }
+            }
+        }
+
+        // API调用函数
+        async function fetchStockData(symbol) {
+            try {
+                // 检查API调用频率限制
+                const now = Date.now();
+                if (now - lastApiCall < API_CALL_INTERVAL) {
+                    console.log('API调用过于频繁，跳过此次请求');
+                    return null;
+                }
+                lastApiCall = now;
+
+                // 使用Alpha Vantage API
+                const apiUrl = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${symbol}&apikey=${apiKey}`;
+                
+                const response = await fetch(apiUrl);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                
+                // 检查API响应
+                if (data['Error Message']) {
+                    throw new Error(data['Error Message']);
+                }
+                
+                if (data['Note']) {
+                    console.warn('API限制:', data['Note']);
+                    return null;
+                }
+                
+                const quote = data['Global Quote'];
+                if (!quote || !quote['05. price']) {
+                    throw new Error('无效的API响应');
+                }
+                
+                return {
+                    symbol: symbol,
+                    price: parseFloat(quote['05. price']),
+                    change: parseFloat(quote['09. change']),
+                    changePercent: parseFloat(quote['10. change percent'].replace('%', '')),
+                    open: parseFloat(quote['02. open']),
+                    high: parseFloat(quote['03. high']),
+                    low: parseFloat(quote['04. low']),
+                    volume: parseInt(quote['06. volume']),
+                    previousClose: parseFloat(quote['08. previous close']),
+                    timestamp: new Date().toLocaleString()
+                };
+                
+            } catch (error) {
+                console.error('API调用失败:', error);
+                return null;
+            }
+        }
+
+        // 加载股票数据
+        async function loadStockData(symbol) {
+            try {
+                // 显示加载状态
+                document.getElementById('lastUpdate').textContent = '正在加载数据...';
+                
+                const data = await fetchStockData(symbol);
+                
+                if (data) {
+                    updateDisplayWithRealData(data);
+                    console.log('✅ 成功加载股票数据:', data);
+                } else {
+                    // 如果API失败，使用模拟数据
+                    console.log('⚠️ API调用失败，使用模拟数据');
+                    generateMockData(symbol);
+                }
+                
+            } catch (error) {
+                console.error('加载股票数据失败:', error);
+                generateMockData(symbol);
+            }
+        }
+
+        // 使用真实数据更新显示
+        function updateDisplayWithRealData(data) {
+            const stockInfo = STOCK_DATABASE[data.symbol];
+            const stockName = stockInfo ? stockInfo.name : data.symbol;
+            
+            // 更新股票信息
+            currentStock = { 
+                name: stockName, 
+                price: data.price, 
+                symbol: data.symbol 
+            };
+            
+            // 更新页面显示
+            document.getElementById('stockName').textContent = stockName;
+            document.getElementById('stockPrice').textContent = '$' + data.price.toFixed(2);
+            
+            const isPositive = data.change >= 0;
+            const arrow = isPositive ? '▲' : '▼';
+            const changeText = arrow + ' ' + (isPositive ? '+' : '') + '$' + data.change.toFixed(2);
+            const pctText = (isPositive ? '+' : '') + data.changePercent.toFixed(2) + '%';
+            
+            document.getElementById('stockChange').textContent = changeText;
+            document.getElementById('stockPct').textContent = pctText;
+            
+            // 更新颜色
+            const color = isPositive ? '#ef4444' : '#10b981';
+            document.getElementById('stockPrice').style.color = color;
+            document.getElementById('stockChange').style.color = color;
+            document.getElementById('stockPct').style.color = color;
+            
+            // 更新最后更新时间
+            document.getElementById('lastUpdate').textContent = `最后更新: ${data.timestamp}`;
+        }
+
+        // 生成模拟数据（备用方案）
+        function generateMockData(symbol) {
+            const stockInfo = STOCK_DATABASE[symbol] || { name: symbol, basePrice: 100.00 };
+            const basePrice = stockInfo.basePrice || 100.00;
+            
+            // 生成随机波动
+            const volatility = 0.02;
+            const changePercent = (Math.random() - 0.5) * volatility * 100;
+            const change = (basePrice * changePercent) / 100;
+            const price = basePrice + change;
+            
+            const mockData = {
+                symbol: symbol,
+                price: parseFloat(price.toFixed(2)),
+                change: parseFloat(change.toFixed(2)),
+                changePercent: parseFloat(changePercent.toFixed(2)),
+                open: parseFloat((basePrice + (Math.random() - 0.5) * basePrice * 0.01).toFixed(2)),
+                high: parseFloat((price + Math.random() * basePrice * 0.01).toFixed(2)),
+                low: parseFloat((price - Math.random() * basePrice * 0.01).toFixed(2)),
+                volume: Math.floor(10000000 * (1 + Math.abs(changePercent) * 10)),
+                previousClose: basePrice,
+                timestamp: new Date().toLocaleString()
+            };
+            
+            updateDisplayWithRealData(mockData);
+        }
+
+        // 实时更新功能
+        function startRealtimeUpdates() {
+            if (updateInterval) {
+                clearInterval(updateInterval);
+            }
+            
+            isRealtime = true;
+            updateInterval = setInterval(() => {
+                loadStockData(currentStock.symbol);
+            }, 30000); // 每30秒更新一次，避免API限制
+            
+            console.log('✅ 实时更新已开启');
+        }
+
+        function stopRealtimeUpdates() {
+            if (updateInterval) {
+                clearInterval(updateInterval);
+                updateInterval = null;
+            }
+            isRealtime = false;
+            console.log('⏹️ 实时更新已停止');
+        }
+
+        // 切换实时更新
+        function toggleRealtime() {
+            if (isRealtime) {
+                stopRealtimeUpdates();
+                showMessage('实时更新已关闭', 'success');
+            } else {
+                startRealtimeUpdates();
+                showMessage('实时更新已开启', 'success');
             }
         }
 
@@ -443,7 +638,7 @@
                                 <div class="text-lg font-bold text-gray-900">$${stock.price.toFixed(2)}</div>
                             </div>
                             <div class="flex gap-2">
-                                <button onclick="switchToStock('${stock.name}', ${stock.price})" class="px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600">
+                                <button onclick="switchToStock('${stock.name}', ${stock.price}, '${stock.symbol || ''}')" class="px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600">
                                     查看
                                 </button>
                                 <button onclick="removeFromWatchList('${stock.name}')" class="px-3 py-1 bg-red-500 text-white rounded text-sm hover:bg-red-600">
@@ -456,10 +651,16 @@
             }
         }
 
-        function switchToStock(name, price) {
-            currentStock = { name, price };
+        function switchToStock(name, price, symbol) {
+            currentStock = { name, price, symbol };
             document.getElementById('stockName').textContent = name;
             document.getElementById('stockPrice').textContent = '$' + price.toFixed(2);
+            
+            // 如果有symbol，尝试加载真实数据
+            if (symbol) {
+                loadStockData(symbol);
+            }
+            
             hideWatchList();
             hideUI();
         }
