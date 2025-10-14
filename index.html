@@ -249,7 +249,9 @@
         let isRealtime = false;
         let updateInterval = null;
         let lastApiCall = 0;
-        const API_CALL_INTERVAL = 5000; // 5秒间隔，避免API限制
+        const API_CALL_INTERVAL = 12000; // 12秒间隔，避免API限制（Alpha Vantage免费版每分钟5次）
+        let apiCallCount = 0;
+        const MAX_API_CALLS_PER_MINUTE = 4; // 每分钟最多4次调用，留有余量
 
         // 股票数据库
         const STOCK_DATABASE = {
@@ -332,13 +334,29 @@
                 // 检查API调用频率限制
                 const now = Date.now();
                 if (now - lastApiCall < API_CALL_INTERVAL) {
-                    console.log('API调用过于频繁，跳过此次请求');
+                    const remainingTime = Math.ceil((API_CALL_INTERVAL - (now - lastApiCall)) / 1000);
+                    console.log(`API调用过于频繁，请等待 ${remainingTime} 秒`);
                     return null;
                 }
+                
+                // 检查每分钟调用次数限制
+                if (apiCallCount >= MAX_API_CALLS_PER_MINUTE) {
+                    console.log('已达到每分钟API调用限制，请稍后重试');
+                    return null;
+                }
+                
                 lastApiCall = now;
+                apiCallCount++;
+                
+                // 每分钟重置计数器
+                setTimeout(() => {
+                    apiCallCount = Math.max(0, apiCallCount - 1);
+                }, 60000);
 
                 // 使用Alpha Vantage API
                 const apiUrl = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${symbol}&apikey=${apiKey}`;
+                
+                console.log(`🔄 正在调用API: ${symbol}`);
                 
                 const response = await fetch(apiUrl);
                 if (!response.ok) {
@@ -361,6 +379,8 @@
                 if (!quote || !quote['05. price']) {
                     throw new Error('无效的API响应');
                 }
+                
+                console.log(`✅ API调用成功: ${symbol}`);
                 
                 return {
                     symbol: symbol,
@@ -440,11 +460,23 @@
 
         // 显示API错误信息
         function showApiError() {
-            document.getElementById('lastUpdate').textContent = '❌ 无法获取数据，请检查网络连接或稍后重试';
-            document.getElementById('lastUpdate').style.color = '#ef4444';
+            const now = Date.now();
+            const timeSinceLastCall = now - lastApiCall;
+            const remainingTime = Math.ceil((API_CALL_INTERVAL - timeSinceLastCall) / 1000);
+            
+            if (timeSinceLastCall < API_CALL_INTERVAL) {
+                document.getElementById('lastUpdate').textContent = `⏳ 请等待 ${remainingTime} 秒后重试`;
+                document.getElementById('lastUpdate').style.color = '#f59e0b';
+            } else if (apiCallCount >= MAX_API_CALLS_PER_MINUTE) {
+                document.getElementById('lastUpdate').textContent = '⏳ 已达到每分钟API限制，请稍后重试';
+                document.getElementById('lastUpdate').style.color = '#f59e0b';
+            } else {
+                document.getElementById('lastUpdate').textContent = '❌ 无法获取数据，请检查网络连接或稍后重试';
+                document.getElementById('lastUpdate').style.color = '#ef4444';
+            }
             
             // 显示错误消息
-            showMessage('无法获取股票数据，请检查网络连接', 'error');
+            showMessage('无法获取股票数据，请稍后重试', 'error');
         }
 
         // 实时更新功能
@@ -456,9 +488,9 @@
             isRealtime = true;
             updateInterval = setInterval(() => {
                 loadStockData(currentStock.symbol);
-            }, 30000); // 每30秒更新一次，避免API限制
+            }, 60000); // 每60秒更新一次，避免API限制
             
-            console.log('✅ 实时更新已开启');
+            console.log('✅ 实时更新已开启（每60秒更新一次）');
         }
 
         function stopRealtimeUpdates() {
