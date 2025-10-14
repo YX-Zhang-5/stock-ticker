@@ -1,0 +1,62 @@
+# GitHub Pages 部署配置
+
+# 网站设置
+title: "股票实时行情 - Stock Ticker"
+description: "实时股票行情显示，支持关注列表、搜索功能，无需登录即可使用"
+author: "Stock Ticker App"
+url: "https://your-username.github.io"
+baseurl: "/stock-ticker"
+
+# 构建设置
+markdown: kramdown
+highlighter: rouge
+theme: minima
+
+# 插件
+plugins:
+  - jekyll-feed
+  - jekyll-sitemap
+  - jekyll-seo-tag
+
+# 排除文件
+exclude:
+  - README.md
+  - Gemfile
+  - Gemfile.lock
+  - node_modules
+  - vendor
+  - .sass-cache
+  - .jekyll-cache
+  - .jekyll-metadata
+  - _site
+  - .git
+  - .gitignore
+
+# 包含文件
+include:
+  - _pages
+
+# 默认设置
+defaults:
+  - scope:
+      path: ""
+      type: "pages"
+    values:
+      layout: "default"
+      author: "Stock Ticker App"
+
+# 集合
+collections:
+  pages:
+    output: true
+    permalink: /:name/
+
+# 数据文件
+data_dir: _data
+
+# 静态文件
+static_files:
+  - production.html
+  - enhanced-watchlist.html
+  - realtime-demo.html
+  - deployment-guide.md

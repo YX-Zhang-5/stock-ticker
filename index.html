@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>股票实时行情 - Stock Ticker</title>
+    <meta name="description" content="实时股票行情显示，支持关注列表、搜索功能，无需登录即可使用">
+    <meta name="keywords" content="股票,行情,实时,关注列表,投资">
+    <meta name="author" content="Stock Ticker App">
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://your-domain.com/">
+    <meta property="og:title" content="股票实时行情 - Stock Ticker">
+    <meta property="og:description" content="实时股票行情显示，支持关注列表、搜索功能">
+    <meta property="og:image" content="https://your-domain.com/og-image.jpg">
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://your-domain.com/">
+    <meta property="twitter:title" content="股票实时行情 - Stock Ticker">
+    <meta property="twitter:description" content="实时股票行情显示，支持关注列表、搜索功能">
+    <meta property="twitter:image" content="https://your-domain.com/og-image.jpg">
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+
+    <!-- Security Headers -->
+    <meta http-equiv="X-Content-Type-Options" content="nosniff">
+    <meta http-equiv="X-Frame-Options" content="DENY">
+    <meta http-equiv="X-XSS-Protection" content="1; mode=block">
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Custom Styles -->
+    <style>
+        /* 优化字体加载 */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+        
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+        
+        /* 优化动画性能 */
+        * {
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        
+        /* 加载动画 */
+        .loading-spinner {
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        
+        /* 优化滚动 */
+        .smooth-scroll {
+            scroll-behavior: smooth;
+        }
+        
+        /* 响应式优化 */
+        @media (max-width: 768px) {
+            .mobile-optimized {
+                font-size: clamp(1rem, 4vw, 1.5rem);
+            }
+        }
+    </style>
+</head>
+<body class="min-h-screen w-full p-2 select-none relative bg-gray-900 text-white smooth-scroll" onclick="toggleUI()">
+    <!-- Loading Screen -->
+    <div id="loadingScreen" class="fixed inset-0 bg-gray-900 flex items-center justify-center z-50">
+        <div class="text-center">
+            <div class="loading-spinner w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-4"></div>
+            <p class="text-gray-400">加载中...</p>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="mx-auto h-full w-full max-w-7xl flex flex-col items-center justify-start pt-4">
+        <!-- Name / Ticker -->
+        <div class="w-full overflow-hidden mb-2">
+            <div id="stockName" class="text-center font-semibold tracking-tight text-[12vmin] mobile-optimized" title="AAPL">
+                AAPL
+            </div>
+        </div>
+
+        <!-- Price big -->
+        <div id="stockPrice" class="text-center font-black leading-none text-[35vmin] text-red-500">
+            $150.25
+        </div>
+
+        <!-- Change info -->
+        <div class="flex justify-center gap-4 text-[8vmin] mb-4">
+            <span id="stockChange" class="text-red-400">▲ +$2.50</span>
+            <span id="stockPct" class="text-red-400">+1.69%</span>
+        </div>
+
+        <!-- Last update -->
+        <div id="lastUpdate" class="text-center text-gray-400 text-sm mb-8">
+            最后更新: 2024-01-01 12:00:00
+        </div>
+
+        <!-- Control Buttons -->
+        <div id="controlButtons" class="absolute top-4 right-4 flex gap-2 z-10 hidden">
+            <button id="watchlistBtn" onclick="toggleWatchlist(event)" class="px-3 py-2 rounded-lg text-sm font-medium transition-colors bg-blue-500 text-white hover:bg-blue-600">
+                ☆ 关注
+            </button>
+            <button onclick="showWatchList(event)" class="px-3 py-2 rounded-lg text-sm font-medium bg-gray-500 text-white hover:bg-gray-600 transition-colors">
+                📋 列表
+            </button>
+            <button onclick="showSearchModal()" class="px-3 py-2 rounded-lg text-sm font-medium bg-green-500 text-white hover:bg-green-600 transition-colors">
+                🔍 搜索
+            </button>
+            <button onclick="hideUI()" class="px-3 py-2 rounded-lg text-sm font-medium bg-gray-700 text-white hover:bg-gray-800 transition-colors">
+                ✕
+            </button>
+        </div>
+    </div>
+
+    <!-- Watch List Modal -->
+    <div id="watchListModal" class="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-20 hidden">
+        <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4 max-h-[80vh] overflow-y-auto">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-bold text-gray-800">关注列表</h2>
+                <button onclick="hideWatchList()" class="text-gray-500 hover:text-gray-700 text-xl">
+                    ✕
+                </button>
+            </div>
+            <div id="watchListContent">
+                <!-- Dynamic content -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Search Stock Modal -->
+    <div id="searchModal" class="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-20 hidden">
+        <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4 max-h-[80vh] overflow-y-auto">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-bold text-gray-800">搜索股票</h2>
+                <button onclick="hideSearchModal()" class="text-gray-500 hover:text-gray-700 text-2xl font-bold">
+                    ×
+                </button>
+            </div>
+            
+            <!-- Search Input -->
+            <div class="mb-4">
+                <input 
+                    type="text" 
+                    id="searchInput" 
+                    placeholder="输入股票代码或名称 (如: AAPL, Apple, 苹果)"
+                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white"
+                    style="color: #111827 !important; background-color: white !important;"
+                    onkeyup="handleSearchInput(event)"
+                    oninput="handleSearchInput(event)"
+                >
+            </div>
+            
+            <!-- Search Results -->
+            <div id="searchResults" class="space-y-2">
+                <div class="text-gray-500 text-center py-4">
+                    输入股票代码或名称开始搜索
+                </div>
+            </div>
+            
+            <!-- Popular Stocks -->
+            <div class="mt-6">
+                <h3 class="text-sm font-semibold text-gray-700 mb-2">热门股票</h3>
+                <div class="grid grid-cols-2 gap-2">
+                    <button onclick="addPopularStock('AAPL', 'Apple Inc.')" class="p-2 text-left bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">
+                        <div class="font-medium text-sm">🍎 Apple</div>
+                        <div class="text-xs text-gray-600">AAPL</div>
+                    </button>
+                    <button onclick="addPopularStock('TSLA', 'Tesla Inc.')" class="p-2 text-left bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">
+                        <div class="font-medium text-sm">🚗 Tesla</div>
+                        <div class="text-xs text-gray-600">TSLA</div>
+                    </button>
+                    <button onclick="addPopularStock('MSFT', 'Microsoft Corporation')" class="p-2 text-left bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">
+                        <div class="font-medium text-sm">🪟 Microsoft</div>
+                        <div class="text-xs text-gray-600">MSFT</div>
+                    </button>
+                    <button onclick="addPopularStock('NVDA', 'NVIDIA Corporation')" class="p-2 text-left bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">
+                        <div class="font-medium text-sm">🎮 NVIDIA</div>
+                        <div class="text-xs text-gray-600">NVDA</div>
+                    </button>
+                    <button onclick="addPopularStock('GOOGL', 'Alphabet Inc.')" class="p-2 text-left bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">
+                        <div class="font-medium text-sm">🔍 Google</div>
+                        <div class="text-xs text-gray-600">GOOGL</div>
+                    </button>
+                    <button onclick="addPopularStock('AMZN', 'Amazon.com Inc.')" class="p-2 text-left bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">
+                        <div class="font-medium text-sm">📦 Amazon</div>
+                        <div class="text-xs text-gray-600">AMZN</div>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Error Message -->
+    <div id="errorMessage" class="fixed top-4 left-1/2 transform -translate-x-1/2 bg-red-500 text-white px-4 py-2 rounded-lg z-30 hidden">
+        <span id="errorText"></span>
+    </div>
+
+    <!-- Success Message -->
+    <div id="successMessage" class="fixed top-4 left-1/2 transform -translate-x-1/2 bg-green-500 text-white px-4 py-2 rounded-lg z-30 hidden">
+        <span id="successText"></span>
+    </div>
+
+    <!-- Analytics -->
+    <script>
+        // Google Analytics (替换为您的GA4 ID)
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'GA_MEASUREMENT_ID');
+    </script>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=GA_MEASUREMENT_ID"></script>
+
+    <!-- Main Application Script -->
+    <script>
+        // 全局变量
+        let currentStock = { name: 'Apple Inc.', price: 150.25 };
+        let watchList = [];
+        let showUI = false;
+        let searchTimeout = null;
+
+        // 股票数据库
+        const STOCK_DATABASE = {
+            'AAPL': { name: 'Apple Inc.', symbol: 'AAPL', category: '科技' },
+            'TSLA': { name: 'Tesla Inc.', symbol: 'TSLA', category: '汽车' },
+            'MSFT': { name: 'Microsoft Corporation', symbol: 'MSFT', category: '科技' },
+            'NVDA': { name: 'NVIDIA Corporation', symbol: 'NVDA', category: '科技' },
+            'GOOGL': { name: 'Alphabet Inc.', symbol: 'GOOGL', category: '科技' },
+            'AMZN': { name: 'Amazon.com Inc.', symbol: 'AMZN', category: '电商' },
+            'META': { name: 'Meta Platforms Inc.', symbol: 'META', category: '科技' },
+            'NFLX': { name: 'Netflix Inc.', symbol: 'NFLX', category: '媒体' },
+            'DIS': { name: 'The Walt Disney Company', symbol: 'DIS', category: '媒体' },
+            'BABA': { name: 'Alibaba Group Holding Limited', symbol: 'BABA', category: '电商' },
+            'JD': { name: 'JD.com Inc.', symbol: 'JD', category: '电商' },
+            'BIDU': { name: 'Baidu Inc.', symbol: 'BIDU', category: '科技' },
+            'NIO': { name: 'NIO Inc.', symbol: 'NIO', category: '汽车' },
+            'XPEV': { name: 'XPeng Inc.', symbol: 'XPEV', category: '汽车' },
+            'LI': { name: 'Li Auto Inc.', symbol: 'LI', category: '汽车' },
+            'PDD': { name: 'PDD Holdings Inc.', symbol: 'PDD', category: '电商' },
+            'TME': { name: 'Tencent Music Entertainment Group', symbol: 'TME', category: '媒体' },
+            'VIPS': { name: 'Vipshop Holdings Limited', symbol: 'VIPS', category: '电商' },
+            'WMT': { name: 'Walmart Inc.', symbol: 'WMT', category: '零售' },
+            'JPM': { name: 'JPMorgan Chase & Co.', symbol: 'JPM', category: '金融' },
+            'BAC': { name: 'Bank of America Corporation', symbol: 'BAC', category: '金融' },
+            'WFC': { name: 'Wells Fargo & Company', symbol: 'WFC', category: '金融' },
+            'GS': { name: 'Goldman Sachs Group Inc.', symbol: 'GS', category: '金融' },
+            'JNJ': { name: 'Johnson & Johnson', symbol: 'JNJ', category: '医疗' },
+            'PFE': { name: 'Pfizer Inc.', symbol: 'PFE', category: '医疗' },
+            'UNH': { name: 'UnitedHealth Group Incorporated', symbol: 'UNH', category: '医疗' },
+            'KO': { name: 'The Coca-Cola Company', symbol: 'KO', category: '饮料' },
+            'PEP': { name: 'PepsiCo Inc.', symbol: 'PEP', category: '饮料' },
+            'MCD': { name: 'McDonald\'s Corporation', symbol: 'MCD', category: '餐饮' },
+            'SBUX': { name: 'Starbucks Corporation', symbol: 'SBUX', category: '餐饮' }
+        };
+
+        // 初始化应用
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeApp();
+        });
+
+        function initializeApp() {
+            // 隐藏加载屏幕
+            setTimeout(() => {
+                document.getElementById('loadingScreen').style.display = 'none';
+            }, 1000);
+
+            // 加载关注列表
+            loadWatchList();
+            
+            // 检查URL参数
+            checkURLParams();
+            
+            // 初始化UI
+            updateWatchListButton();
+        }
+
+        // 检查URL参数
+        function checkURLParams() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const symbol = urlParams.get('symbol');
+            
+            if (symbol) {
+                const stock = STOCK_DATABASE[symbol.toUpperCase()];
+                if (stock) {
+                    currentStock = { name: stock.name, price: 150.25 };
+                    document.getElementById('stockName').textContent = stock.name;
+                    document.getElementById('stockPrice').textContent = '$150.25';
+                }
+            }
+        }
+
+
+        // Watch list 功能 - 增强版
+        function loadWatchList() {
+            try {
+                // 1. 优先从 LocalStorage 加载
+                const saved = localStorage.getItem('stockWatchList');
+                if (saved) {
+                    watchList = JSON.parse(saved);
+                    console.log('✅ 从 LocalStorage 加载关注列表');
+                    return;
+                }
+                
+                // 2. 尝试从 URL 参数加载
+                const urlParams = new URLSearchParams(window.location.search);
+                const urlWatchList = urlParams.get('watchlist');
+                if (urlWatchList) {
+                    try {
+                        watchList = JSON.parse(decodeURIComponent(urlWatchList));
+                        console.log('✅ 从 URL 参数加载关注列表');
+                        // 保存到 LocalStorage 以便下次使用
+                        saveWatchList();
+                        return;
+                    } catch (e) {
+                        console.warn('URL 参数解析失败:', e);
+                    }
+                }
+                
+                // 3. 尝试从 Cookie 加载
+                const cookies = document.cookie.split(';');
+                const watchlistCookie = cookies.find(cookie => cookie.trim().startsWith('watchlist='));
+                if (watchlistCookie) {
+                    try {
+                        const cookieData = watchlistCookie.split('=')[1];
+                        watchList = JSON.parse(decodeURIComponent(cookieData));
+                        console.log('✅ 从 Cookie 加载关注列表');
+                        // 保存到 LocalStorage 以便下次使用
+                        saveWatchList();
+                        return;
+                    } catch (e) {
+                        console.warn('Cookie 解析失败:', e);
+                    }
+                }
+                
+                console.log('ℹ️ 未找到保存的关注列表，使用空列表');
+            } catch (e) {
+                console.error('Failed to load watch list:', e);
+            }
+        }
+
+        function saveWatchList() {
+            try {
+                // 1. 保存到 LocalStorage (主要存储)
+                localStorage.setItem('stockWatchList', JSON.stringify(watchList));
+                
+                // 2. 保存到 Cookie (备份，7天过期)
+                const cookieData = encodeURIComponent(JSON.stringify(watchList));
+                if (cookieData.length < 4000) { // Cookie 大小限制
+                    document.cookie = `watchlist=${cookieData}; max-age=604800; path=/`;
+                }
+                
+                // 3. 更新 URL 参数 (如果数据不太大)
+                const urlData = encodeURIComponent(JSON.stringify(watchList));
+                if (urlData.length < 1000) { // URL 长度限制
+                    const url = new URL(window.location);
+                    url.searchParams.set('watchlist', urlData);
+                    window.history.replaceState({}, '', url);
+                }
+                
+                console.log('✅ 关注列表已保存到多种存储方式');
+            } catch (e) {
+                console.error('Failed to save watch list:', e);
+            }
+        }
+
+        function isInWatchList() {
+            return watchList.some(stock => stock.name === currentStock.name);
+        }
+
+        function toggleWatchlist(event) {
+            event.stopPropagation();
+            if (isInWatchList()) {
+                watchList = watchList.filter(stock => stock.name !== currentStock.name);
+                document.getElementById('watchlistBtn').textContent = '☆ 关注';
+                document.getElementById('watchlistBtn').className = 'px-3 py-2 rounded-lg text-sm font-medium transition-colors bg-blue-500 text-white hover:bg-blue-600';
+            } else {
+                watchList.push({ ...currentStock });
+                document.getElementById('watchlistBtn').textContent = '★ 已关注';
+                document.getElementById('watchlistBtn').className = 'px-3 py-2 rounded-lg text-sm font-medium transition-colors bg-red-500 text-white hover:bg-red-600';
+            }
+            saveWatchList();
+        }
+
+        function showWatchList(event) {
+            event.stopPropagation();
+            updateWatchListDisplay();
+            document.getElementById('watchListModal').classList.remove('hidden');
+        }
+
+        function hideWatchList() {
+            document.getElementById('watchListModal').classList.add('hidden');
+        }
+
+        function updateWatchListDisplay() {
+            const content = document.getElementById('watchListContent');
+            if (watchList.length === 0) {
+                content.innerHTML = `
+                    <div class="text-center py-8">
+                        <p class="text-gray-500 mb-4">暂无关注的股票</p>
+                        <div class="flex justify-center gap-2">
+                            <button onclick="exportWatchList()" class="px-3 py-2 bg-gray-500 text-white rounded text-sm hover:bg-gray-600">
+                                📤 导出
+                            </button>
+                            <button onclick="importWatchList()" class="px-3 py-2 bg-gray-500 text-white rounded text-sm hover:bg-gray-600">
+                                📥 导入
+                            </button>
+                        </div>
+                    </div>
+                `;
+            } else {
+                content.innerHTML = `
+                    <!-- 操作按钮 -->
+                    <div class="flex justify-center gap-2 mb-4">
+                        <button onclick="exportWatchList()" class="px-3 py-2 bg-green-500 text-white rounded text-sm hover:bg-green-600">
+                            📤 导出
+                        </button>
+                        <button onclick="importWatchList()" class="px-3 py-2 bg-blue-500 text-white rounded text-sm hover:bg-blue-600">
+                            📥 导入
+                        </button>
+                        <button onclick="copyShareLink()" class="px-3 py-2 bg-purple-500 text-white rounded text-sm hover:bg-purple-600">
+                            🔗 分享
+                        </button>
+                    </div>
+                    
+                    <!-- 股票列表 -->
+                    ${watchList.map((stock, index) => `
+                        <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg mb-3">
+                            <div class="flex-1">
+                                <div class="font-semibold text-gray-800">${stock.name}</div>
+                                <div class="text-sm text-gray-600">${stock.symbol || stock.name}</div>
+                                <div class="text-lg font-bold text-gray-900">$${stock.price.toFixed(2)}</div>
+                            </div>
+                            <div class="flex gap-2">
+                                <button onclick="switchToStock('${stock.name}', ${stock.price})" class="px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600">
+                                    查看
+                                </button>
+                                <button onclick="removeFromWatchList('${stock.name}')" class="px-3 py-1 bg-red-500 text-white rounded text-sm hover:bg-red-600">
+                                    移除
+                                </button>
+                            </div>
+                        </div>
+                    `).join('')}
+                `;
+            }
+        }
+
+        function switchToStock(name, price) {
+            currentStock = { name, price };
+            document.getElementById('stockName').textContent = name;
+            document.getElementById('stockPrice').textContent = '$' + price.toFixed(2);
+            hideWatchList();
+            hideUI();
+        }
+
+        function removeFromWatchList(name) {
+            watchList = watchList.filter(stock => stock.name !== name);
+            saveWatchList();
+            updateWatchListDisplay();
+        }
+
+        // 文件导入/导出功能
+        function exportWatchList() {
+            try {
+                const dataStr = JSON.stringify(watchList, null, 2);
+                const dataBlob = new Blob([dataStr], { type: 'application/json' });
+                const url = URL.createObjectURL(dataBlob);
+                
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `stock-watchlist-${new Date().toISOString().split('T')[0]}.json`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+                
+                console.log('✅ 关注列表已导出');
+                showMessage('关注列表已导出', 'success');
+            } catch (e) {
+                console.error('导出失败:', e);
+                showMessage('导出失败，请重试', 'error');
+            }
+        }
+
+        function importWatchList() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.json';
+            input.onchange = function(event) {
+                const file = event.target.files[0];
+                if (!file) return;
+                
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    try {
+                        const importedData = JSON.parse(e.target.result);
+                        if (Array.isArray(importedData)) {
+                            // 合并导入的数据
+                            const existingNames = watchList.map(stock => stock.name);
+                            const newStocks = importedData.filter(stock => !existingNames.includes(stock.name));
+                            watchList = [...watchList, ...newStocks];
+                            saveWatchList();
+                            updateWatchListDisplay();
+                            console.log(`✅ 成功导入 ${newStocks.length} 个新股票`);
+                            showMessage(`成功导入 ${newStocks.length} 个新股票`, 'success');
+                        } else {
+                            throw new Error('文件格式不正确');
+                        }
+                    } catch (error) {
+                        console.error('导入失败:', error);
+                        showMessage('导入失败：文件格式不正确', 'error');
+                    }
+                };
+                reader.readAsText(file);
+            };
+            input.click();
+        }
+
+        // 生成分享链接
+        function generateShareLink() {
+            try {
+                const urlData = encodeURIComponent(JSON.stringify(watchList));
+                if (urlData.length < 1000) {
+                    const url = new URL(window.location);
+                    url.searchParams.set('watchlist', urlData);
+                    return url.toString();
+                } else {
+                    // 如果数据太大，只分享股票代码
+                    const symbols = watchList.map(stock => stock.symbol || stock.name).join(',');
+                    const url = new URL(window.location);
+                    url.searchParams.set('symbols', symbols);
+                    return url.toString();
+                }
+            } catch (e) {
+                console.error('生成分享链接失败:', e);
+                return window.location.href;
+            }
+        }
+
+        function copyShareLink() {
+            const shareLink = generateShareLink();
+            navigator.clipboard.writeText(shareLink).then(() => {
+                console.log('✅ 分享链接已复制到剪贴板');
+                showMessage('分享链接已复制到剪贴板！', 'success');
+            }).catch(() => {
+                // 降级方案
+                const textArea = document.createElement('textarea');
+                textArea.value = shareLink;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                showMessage('分享链接已复制到剪贴板！', 'success');
+            });
+        }
+
+        // 搜索功能
+        function showSearchModal() {
+            document.getElementById('searchModal').classList.remove('hidden');
+            setTimeout(() => {
+                document.getElementById('searchInput').focus();
+            }, 100);
+        }
+
+        function hideSearchModal() {
+            document.getElementById('searchModal').classList.add('hidden');
+        }
+
+        function searchStocks(query) {
+            if (!query || query.length < 1) {
+                return [];
+            }
+            
+            const results = [];
+            const lowerQuery = query.toLowerCase();
+            
+            for (const [symbol, stock] of Object.entries(STOCK_DATABASE)) {
+                const symbolMatch = symbol.toLowerCase().includes(lowerQuery);
+                const nameMatch = stock.name.toLowerCase().includes(lowerQuery);
+                
+                if (symbolMatch || nameMatch) {
+                    results.push({
+                        ...stock,
+                        matchType: symbolMatch ? 'symbol' : 'name',
+                        matchScore: symbolMatch ? 2 : 1
+                    });
+                }
+            }
+            
+            return results.sort((a, b) => {
+                if (a.matchScore !== b.matchScore) {
+                    return b.matchScore - a.matchScore;
+                }
+                return a.name.localeCompare(b.name);
+            });
+        }
+
+        function handleSearchInput(event) {
+            const query = event.target.value.trim();
+            
+            if (searchTimeout) {
+                clearTimeout(searchTimeout);
+            }
+            
+            searchTimeout = setTimeout(() => {
+                const results = searchStocks(query);
+                displaySearchResults(results);
+            }, 300);
+        }
+
+        function displaySearchResults(results) {
+            const container = document.getElementById('searchResults');
+            
+            if (results.length === 0) {
+                container.innerHTML = '<div class="text-gray-500 text-center py-4">未找到匹配的股票</div>';
+                return;
+            }
+            
+            container.innerHTML = results.map(stock => `
+                <div class="p-3 bg-gray-100 hover:bg-gray-200 rounded-lg cursor-pointer transition-colors" onclick="addStockFromSearch('${stock.symbol}', '${stock.name}')">
+                    <div class="font-semibold text-gray-800">${stock.name}</div>
+                    <div class="text-sm text-gray-600">${stock.symbol} • ${stock.category}</div>
+                </div>
+            `).join('');
+        }
+
+        function addStockFromSearch(symbol, name) {
+            const stock = {
+                name: name,
+                symbol: symbol,
+                price: 150.25 // 默认价格
+            };
+            
+            // 添加到关注列表
+            watchList.push(stock);
+            saveWatchList();
+            
+            // 更新显示
+            updateWatchListDisplay();
+            
+            // 关闭搜索模态框
+            hideSearchModal();
+            
+            // 显示成功消息
+            showMessage(`已添加 ${name} (${symbol}) 到关注列表`, 'success');
+        }
+
+        // 添加热门股票
+        function addPopularStock(symbol, name) {
+            addStockFromSearch(symbol, name);
+        }
+
+        // 显示消息
+        function showMessage(message, type = 'success') {
+            const messageElement = type === 'success' ? 
+                document.getElementById('successMessage') : 
+                document.getElementById('errorMessage');
+            const textElement = type === 'success' ? 
+                document.getElementById('successText') : 
+                document.getElementById('errorText');
+            
+            textElement.textContent = message;
+            messageElement.classList.remove('hidden');
+            
+            setTimeout(() => {
+                messageElement.classList.add('hidden');
+            }, 3000);
+        }
+
+        // UI 控制
+        function toggleUI() {
+            showUI = !showUI;
+            if (showUI) {
+                document.getElementById('controlButtons').classList.remove('hidden');
+                updateWatchListButton();
+            } else {
+                document.getElementById('controlButtons').classList.add('hidden');
+            }
+        }
+
+        function hideUI() {
+            if (event) event.stopPropagation();
+            showUI = false;
+            document.getElementById('controlButtons').classList.add('hidden');
+        }
+
+        function updateWatchListButton() {
+            const btn = document.getElementById('watchlistBtn');
+            if (isInWatchList()) {
+                btn.textContent = '★ 已关注';
+                btn.className = 'px-3 py-2 rounded-lg text-sm font-medium transition-colors bg-red-500 text-white hover:bg-red-600';
+            } else {
+                btn.textContent = '☆ 关注';
+                btn.className = 'px-3 py-2 rounded-lg text-sm font-medium transition-colors bg-blue-500 text-white hover:bg-blue-600';
+            }
+        }
+
+
+        // 错误处理
+        window.addEventListener('error', function(e) {
+            console.error('Global error:', e.error);
+            showMessage('发生错误，请刷新页面重试', 'error');
+        });
+
+        // 性能监控
+        window.addEventListener('load', function() {
+            // 记录页面加载时间
+            const loadTime = performance.now();
+            console.log(`页面加载时间: ${loadTime.toFixed(2)}ms`);
+            
+            // 发送性能数据到分析服务
+            if (typeof gtag !== 'undefined') {
+                gtag('event', 'page_load_time', {
+                    'value': Math.round(loadTime)
+                });
+            }
+        });
+    </script>
+</body>
+</html>
