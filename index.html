@@ -72,6 +72,32 @@
                 font-size: clamp(1rem, 4vw, 1.5rem);
             }
         }
+        
+        /* 全屏模式样式 */
+        .fullscreen-mode {
+            background-color: #000 !important;
+        }
+        
+        .fullscreen-mode .controlButtons {
+            opacity: 0.8;
+        }
+        
+        /* 移动端优化 */
+        @media (max-width: 768px) {
+            body {
+                -webkit-touch-callout: none;
+                -webkit-user-select: none;
+                -khtml-user-select: none;
+                -moz-user-select: none;
+                -ms-user-select: none;
+                user-select: none;
+            }
+            
+            /* 防止双击缩放 */
+            * {
+                touch-action: manipulation;
+            }
+        }
     </style>
 </head>
 <body class="min-h-screen w-full p-2 select-none relative bg-gray-900 text-white smooth-scroll" onclick="toggleUI()">
@@ -246,15 +272,109 @@
         // - 实时价格数据
         // ========================================
         
-        // 全局变量
-        let currentStock = { name: 'Apple Inc.', price: 150.25, symbol: 'AAPL' };
-        let watchList = [];
-        let showUI = false;
-        let searchTimeout = null;
+        // 移动端全屏功能
+        let isFullscreen = false;
+        let lastTapTime = 0;
+        let tapCount = 0;
         
-        // 数据缓存
-        let lastSuccessfulData = null;
-        let lastUpdateTime = null;
+        // 检测是否为移动设备
+        function isMobileDevice() {
+            return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
+                   ('ontouchstart' in window) || 
+                   (navigator.maxTouchPoints > 0);
+        }
+        
+        // 双击检测
+        function handleDoubleTap(event) {
+            const currentTime = new Date().getTime();
+            const tapLength = currentTime - lastTapTime;
+            
+            if (tapLength < 500 && tapLength > 0) {
+                // 双击检测成功
+                toggleFullscreen();
+                event.preventDefault();
+                return false;
+            }
+            
+            lastTapTime = currentTime;
+        }
+        
+        // 切换全屏模式
+        function toggleFullscreen() {
+            if (!isMobileDevice()) {
+                console.log('全屏功能仅在移动设备上可用');
+                return;
+            }
+            
+            if (!isFullscreen) {
+                enterFullscreen();
+            } else {
+                exitFullscreen();
+            }
+        }
+        
+        // 进入全屏模式
+        function enterFullscreen() {
+            try {
+                // 尝试进入全屏
+                if (document.documentElement.requestFullscreen) {
+                    document.documentElement.requestFullscreen();
+                } else if (document.documentElement.webkitRequestFullscreen) {
+                    document.documentElement.webkitRequestFullscreen();
+                } else if (document.documentElement.mozRequestFullScreen) {
+                    document.documentElement.mozRequestFullScreen();
+                } else if (document.documentElement.msRequestFullscreen) {
+                    document.documentElement.msRequestFullscreen();
+                }
+                
+                // 尝试锁定屏幕方向为横向
+                if (screen.orientation && screen.orientation.lock) {
+                    screen.orientation.lock('landscape').catch(err => {
+                        console.log('无法锁定屏幕方向:', err);
+                    });
+                }
+                
+                isFullscreen = true;
+                document.body.classList.add('fullscreen-mode');
+                showMessage('已进入全屏模式', 'success');
+                
+            } catch (error) {
+                console.error('进入全屏失败:', error);
+                showMessage('无法进入全屏模式', 'error');
+            }
+        }
+        
+        // 退出全屏模式
+        function exitFullscreen() {
+            try {
+                if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                } else if (document.webkitExitFullscreen) {
+                    document.webkitExitFullscreen();
+                } else if (document.mozCancelFullScreen) {
+                    document.mozCancelFullScreen();
+                } else if (document.msExitFullscreen) {
+                    document.msExitFullscreen();
+                }
+                
+                isFullscreen = false;
+                document.body.classList.remove('fullscreen-mode');
+                showMessage('已退出全屏模式', 'success');
+                
+            } catch (error) {
+                console.error('退出全屏失败:', error);
+                showMessage('无法退出全屏模式', 'error');
+            }
+        }
+        
+        // 监听全屏状态变化
+        function handleFullscreenChange() {
+            if (!document.fullscreenElement && !document.webkitFullscreenElement && 
+                !document.mozFullScreenElement && !document.msFullscreenElement) {
+                isFullscreen = false;
+                document.body.classList.remove('fullscreen-mode');
+            }
+        }
         
         // 多API配置 - 只使用Finnhub
         const API_CONFIGS = {
@@ -333,7 +453,26 @@
             // 自动加载初始数据
             loadInitialData();
             
+            // 初始化移动端全屏功能
+            initializeMobileFullscreen();
+            
             console.log('✅ 应用初始化完成，正在加载初始数据');
+        }
+
+        // 初始化移动端全屏功能
+        function initializeMobileFullscreen() {
+            if (isMobileDevice()) {
+                // 添加双击事件监听
+                document.addEventListener('touchend', handleDoubleTap, { passive: false });
+                
+                // 监听全屏状态变化
+                document.addEventListener('fullscreenchange', handleFullscreenChange);
+                document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+                document.addEventListener('mozfullscreenchange', handleFullscreenChange);
+                document.addEventListener('MSFullscreenChange', handleFullscreenChange);
+                
+                console.log('✅ 移动端全屏功能已初始化');
+            }
         }
 
         // 初始化显示状态
@@ -946,14 +1085,19 @@
                         const pctText = stock.changePercent ? `(${isPositive ? '+' : ''}${stock.changePercent.toFixed(2)}%)` : '';
                         const priceColor = stock.change >= 0 ? '#ef4444' : '#10b981';
                         
+                        // 检查是否有价格数据
+                        const hasPriceData = stock.price > 0;
+                        const priceDisplay = hasPriceData ? `$${stock.price.toFixed(2)}` : '加载中...';
+                        const priceColorStyle = hasPriceData ? priceColor : '#9ca3af';
+                        
                         return `
                         <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg mb-3">
                             <div class="flex-1">
                                 <div class="font-semibold text-gray-800">${stock.name}</div>
                                 <div class="text-sm text-gray-600">${stock.symbol || stock.name}</div>
-                                <div class="text-lg font-bold" style="color: ${priceColor}">$${stock.price.toFixed(2)}</div>
-                                ${changeText ? `<div class="text-sm" style="color: ${priceColor}">${changeText} ${pctText}</div>` : ''}
-                                ${stock.lastUpdate ? `<div class="text-xs text-gray-500">更新: ${stock.lastUpdate}</div>` : ''}
+                                <div class="text-lg font-bold" style="color: ${priceColorStyle}">${priceDisplay}</div>
+                                ${hasPriceData && changeText ? `<div class="text-sm" style="color: ${priceColor}">${changeText} ${pctText}</div>` : ''}
+                                ${stock.lastUpdate ? `<div class="text-xs text-gray-500">更新: ${stock.lastUpdate}</div>` : hasPriceData ? '' : '<div class="text-xs text-gray-400">正在加载数据...</div>'}
                             </div>
                             <div class="flex gap-2">
                                 <button onclick="switchToStock('${stock.name}', ${stock.price}, '${stock.symbol || ''}')" class="px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600">
@@ -1165,7 +1309,10 @@
             const stock = {
                 name: name,
                 symbol: symbol,
-                price: 0 // 默认价格，等待API获取
+                price: 0, // 默认价格，等待API获取
+                change: 0,
+                changePercent: 0,
+                lastUpdate: null
             };
             
             // 检查是否已存在
@@ -1185,12 +1332,39 @@
             hideSearchModal();
             
             // 显示成功消息
-            showMessage(`已添加 ${name} (${symbol}) 到关注列表`, 'success');
+            showMessage(`已添加 ${name} (${symbol}) 到关注列表，正在加载数据...`, 'success');
+            
+            // 立即加载股票数据
+            loadStockDataForWatchList(symbol);
         }
 
         // 添加热门股票
         function addPopularStock(symbol, name) {
             addStockFromSearch(symbol, name);
+        }
+
+        // 为关注列表中的股票加载数据
+        async function loadStockDataForWatchList(symbol) {
+            try {
+                console.log(`🔄 正在为关注列表加载 ${symbol} 的数据`);
+                
+                const data = await fetchStockData(symbol);
+                
+                if (data) {
+                    // 更新关注列表中对应股票的数据
+                    updateWatchListStockPrice(symbol, data.price, data.change, data.changePercent);
+                    
+                    // 更新关注列表显示
+                    updateWatchListDisplay();
+                    
+                    console.log(`✅ 成功为关注列表加载 ${symbol} 的数据:`, data);
+                } else {
+                    console.log(`❌ 无法为关注列表加载 ${symbol} 的数据`);
+                }
+                
+            } catch (error) {
+                console.error(`为关注列表加载 ${symbol} 数据失败:`, error);
+            }
         }
 
         // 刷新关注列表中所有股票的价格
